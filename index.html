@@ -222,8 +222,8 @@
         }
 
         // 获取生日总人数
-        async function getTotalBirthdayCount() {
-            const birthdays = await fetchBirthdays();
+        async function getTotalBirthdayCount(group = '') {
+            const birthdays = await fetchBirthdays(group);
             return birthdays.length;
         }
 
@@ -232,17 +232,39 @@
             const groups = await fetchGroupList();
             updateGroupSelect(groups);
 
-            // 设置人数输入框的最大值
             const countInput = document.getElementById('count-input');
-            countInput.max = await getTotalBirthdayCount();
+            const groupSelect = document.getElementById('group-select');
+
+            // 设置人数输入框的最大值
+            const selectedGroup = groupSelect.value;
+            countInput.max = await getTotalBirthdayCount(selectedGroup);
+
+            // 添加组别选择变化事件监听
+            groupSelect.addEventListener('change', async function() {
+                const selectedGroup = this.value;
+
+                // 更新人数输入框的最大值
+                const totalCount = await getTotalBirthdayCount(selectedGroup);
+                countInput.value = 15;
+                countInput.max = totalCount;
+
+                // 如果当前设置的人数超过新组别的总人数，则自动调整
+                if (parseInt(countInput.value) > totalCount) {
+                    countInput.value = totalCount;
+                }
+
+                // 更新生日显示
+                updateBirthdays(selectedGroup);
+            });
         }
 
         // 获取生日数据
-        async function fetchBirthdays() {
+        async function fetchBirthdays(group = '') {
             try {
-                const response = await fetch('https://raw.githubusercontent.com/qjwh/birthdays/refs/heads/main/birthdays.txt');
+                let filePath = `https://raw.githubusercontent.com/qjwh/birthdays/refs/heads/main/birthdays${group}.txt`;
+                const response = await fetch(filePath);
                 if (!response.ok) {
-                    throw new Error('无法获取生日数据');
+                    throw new Error(`无法获取${group ? group + '组' : '默认'}的生日数据`);
                 }
                 const text = await response.text();
                 return parseBirthdays(text);
@@ -322,8 +344,8 @@
         }
 
         // 更新生日显示
-        async function updateBirthdays() {
-            const birthdays = await fetchBirthdays();
+        async function updateBirthdays(group = '') {
+            const birthdays = await fetchBirthdays(group);
             const today = new Date();
             const currentMonth = today.getMonth() + 1;
             const currentDay = today.getDate();
@@ -433,17 +455,27 @@
         function init() {
             updateCurrentTime();
             initSettings().then(() => {
-                updateBirthdays();
+                const groupSelect = document.getElementById('group-select');
+                const selectedGroup = groupSelect.value;
+                updateBirthdays(selectedGroup);
             });
 
             // 每秒更新一次时间
             setInterval(updateCurrentTime, 1000);
 
             // 每分钟更新一次生日列表（避免频繁请求文件）
-            setInterval(updateBirthdays, 60000);
+            setInterval(() => {
+                const groupSelect = document.getElementById('group-select');
+                const selectedGroup = groupSelect.value;
+                updateBirthdays(selectedGroup);
+            }, 60000);
 
             // 添加人数输入框变化监听
-            document.getElementById('count-input').addEventListener('change', updateBirthdays);
+            document.getElementById('count-input').addEventListener('change', function() {
+                const groupSelect = document.getElementById('group-select');
+                const selectedGroup = groupSelect.value;
+                updateBirthdays(selectedGroup);
+            });
         }
 
         // 页面加载完成后初始化
