@@ -5,18 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>生日倒计时</title>
     <style>
-        @font-face { 
+        @font-face {
             font-family: 'HarmonyOS Sans SC';
             src: url('/HarmonyOS_Sans_SC.ttf');
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             font-family: 'HarmonyOS Sans SC', sans-serif;
         }
-        
+
         body {
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
@@ -25,7 +25,7 @@
             align-items: center;
             padding: 20px;
         }
-        
+
         .container {
             width: 100%;
             max-width: 800px;
@@ -33,7 +33,7 @@
             flex-direction: column;
             gap: 20px;
         }
-        
+
         .section {
             background: white;
             border-radius: 15px;
@@ -41,39 +41,39 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
-        
+
         h2 {
             color: #333;
             margin-bottom: 15px;
             font-size: 1.5rem;
         }
-        
+
         .current-time {
             font-size: 1.2rem;
             color: #333;
         }
-        
+
         .birthday-list {
             list-style: none;
         }
-        
+
         .birthday-item {
             padding: 10px;
             margin: 8px 0;
             border-radius: 8px;
             background-color: #f8f9fa;
         }
-        
+
         .today {
             color: #333;
             font-weight: bold;
         }
-        
+
         .no-birthday {
             color: #888;
             font-style: italic;
         }
-        
+
         .upcoming {
             display: flex;
             justify-content: space-between;
@@ -83,19 +83,19 @@
             border-radius: 8px;
             background-color: #f0f8ff;
         }
-        
+
         .index {
             color: #888;
             font-size: 0.9em;
             margin-right: 5px;
         }
-        
+
         .name {
             color: #333;
             flex: 2;
             text-align: left;
         }
-        
+
         .birthday-date {
             color: #666;
             position: absolute;
@@ -103,10 +103,40 @@
             transform: translateX(-50%);
             text-align: center;
         }
-        
+
         .days {
             color: #1e90ff;
             font-weight: bold;
+        }
+
+        .settings-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .setting-item label {
+            color: #333;
+            font-weight: bold;
+        }
+
+        .setting-input {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 8px 12px;
+            width: 200px;
+            text-align: right;
+        }
+
+        .setting-input:focus {
+            outline: none;
+            border-color: #1e90ff;
         }
     </style>
 </head>
@@ -116,14 +146,30 @@
             <h2>当前时间</h2>
             <div id="current-time" class="current-time">正在加载时间...</div>
         </div>
-        
+
+        <div class="section settings-section">
+            <h2>设置</h2>
+            <div class="settings-container">
+                <div class="setting-item">
+                    <label for="group-select">选择组别：</label>
+                    <select id="group-select" class="setting-input">
+                        <!-- 选项将通过JS动态加载 -->
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="count-input">显示人数：</label>
+                    <input type="number" id="count-input" class="setting-input" min="1" value="15">
+                </div>
+            </div>
+        </div>
+
         <div class="section">
             <h2>今天过生日的人</h2>
             <ul id="today-birthdays" class="birthday-list">
                 <li class="no-birthday">正在加载...</li>
             </ul>
         </div>
-        
+
         <div class="section">
             <h2>即将过生日的人</h2>
             <ul id="upcoming-birthdays" class="birthday-list">
@@ -133,6 +179,64 @@
     </div>
 
     <script>
+        // 获取组别列表
+        async function fetchGroupList() {
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/qjwh/birthdays/refs/heads/main/list.txt');
+                if (!response.ok) {
+                    throw new Error('无法获取组别列表');
+                }
+                const text = await response.text();
+                return parseGroupList(text);
+            } catch (error) {
+                console.error('获取组别列表时出错:', error);
+                return [''];
+            }
+        }
+
+        // 解析组别列表
+        function parseGroupList(text) {
+            const groups = [];
+            const lines = text.split('\n');
+
+            for (const line of lines) {
+                if (line.trim() !== '') {
+                    groups.push(line.trim());
+                }
+            }
+
+            return groups;
+        }
+
+        // 更新组别选择下拉框
+        function updateGroupSelect(groups) {
+            const select = document.getElementById('group-select');
+            select.innerHTML = '';
+
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group;
+                option.textContent = group;
+                select.appendChild(option);
+            });
+        }
+
+        // 获取生日总人数
+        async function getTotalBirthdayCount() {
+            const birthdays = await fetchBirthdays();
+            return birthdays.length;
+        }
+
+        // 初始化设置
+        async function initSettings() {
+            const groups = await fetchGroupList();
+            updateGroupSelect(groups);
+
+            // 设置人数输入框的最大值
+            const countInput = document.getElementById('count-input');
+            countInput.max = await getTotalBirthdayCount();
+        }
+
         // 获取生日数据
         async function fetchBirthdays() {
             try {
@@ -152,27 +256,27 @@
         function parseBirthdays(text) {
             const lines = text.split('\n');
             const birthdays = [];
-            
+
             for (const line of lines) {
                 if (line.trim() === '') continue;
-                
+
                 const parts = line.split(',');
                 if (parts.length !== 2) continue;
-                
+
                 const dateStr = parts[0].trim();
                 const name = parts[1].trim();
-                
+
                 const dateParts = dateStr.split('/');
                 if (dateParts.length !== 2) continue;
-                
+
                 const month = parseInt(dateParts[0]);
                 const day = parseInt(dateParts[1]);
-                
+
                 if (isNaN(month) || isNaN(day)) continue;
-                
+
                 birthdays.push({ month, day, name });
             }
-            
+
             return birthdays;
         }
 
@@ -180,10 +284,10 @@
         function getNextBirthday(month, day) {
             const today = new Date();
             const currentYear = today.getFullYear();
-            
+
             // 创建今年生日日期
             const thisYearBirthday = new Date(currentYear, month - 1, day);
-            
+
             // 如果今年生日已经过了，就计算明年生日
             if (thisYearBirthday < today) {
                 return new Date(currentYear + 1, month - 1, day);
@@ -196,10 +300,10 @@
         function getDaysUntilBirthday(birthday) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            
+
             const diffTime = birthday.getTime() - today.getTime();
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
+
             return diffDays;
         }
 
@@ -212,8 +316,8 @@
             const hour = now.getHours().toString().padStart(2, '0');
             const minute = now.getMinutes().toString().padStart(2, '0');
             const second = now.getSeconds().toString().padStart(2, '0');
-            
-            document.getElementById('current-time').textContent = 
+
+            document.getElementById('current-time').textContent =
                 `现在时间是 ${year} 年 ${month} 月 ${day} 日 ${hour} 时 ${minute} 分 ${second} 秒`;
         }
 
@@ -223,12 +327,16 @@
             const today = new Date();
             const currentMonth = today.getMonth() + 1;
             const currentDay = today.getDate();
-            
+
+            // 获取设置的人数限制
+            const countInput = document.getElementById('count-input');
+            const maxCount = parseInt(countInput.value) || 15;
+
             // 找出今天过生日的人
-            const todayBirthdays = birthdays.filter(b => 
+            const todayBirthdays = birthdays.filter(b =>
                 b.month === currentMonth && b.day === currentDay
             );
-            
+
             // 找出未来过生日的人
             const upcomingBirthdays = birthdays
                 .map(b => {
@@ -238,11 +346,11 @@
                 })
                 .filter(b => b.daysUntil < 365) // 排除今天过生日的人
                 .sort((a, b) => a.daysUntil - b.daysUntil); // 按天数升序排序
-            
+
             // 按日期分组，确保同一天的人一起显示
             const groupedBirthdays = [];
             let currentGroup = null;
-            
+
             for (const birthday of upcomingBirthdays) {
                 if (!currentGroup || currentGroup.daysUntil !== birthday.daysUntil) {
                     currentGroup = {
@@ -254,11 +362,11 @@
                     currentGroup.birthdays.push(birthday);
                 }
             }
-            
+
             // 显示今天过生日的人
             const todayList = document.getElementById('today-birthdays');
             todayList.innerHTML = '';
-            
+
             if (todayBirthdays.length > 0) {
                 todayBirthdays.forEach(b => {
                     const li = document.createElement('li');
@@ -272,46 +380,47 @@
                 li.textContent = '今天没有人过生日';
                 todayList.appendChild(li);
             }
-            
+
             // 显示即将过生日的人
             const upcomingList = document.getElementById('upcoming-birthdays');
             upcomingList.innerHTML = '';
-            
+
             let count = 0;
             for (const group of groupedBirthdays) {
-                if (count + group.birthdays.length > 15) break;
-                
+                // if (count + group.birthdays.length > maxCount) break;
+                if (count >= maxCount) break;
+
                 for (const birthday of group.birthdays) {
                     const li = document.createElement('li');
                     li.className = 'upcoming';
-                    
+
                     const indexSpan = document.createElement('span');
                     indexSpan.className = 'index';
                     indexSpan.textContent = `#${count+1}.`;
-                    
+
                     const nameSpan = document.createElement('span');
                     nameSpan.className = 'name';
                     nameSpan.textContent = birthday.name;
-                    
+
                     const dateSpan = document.createElement('span');
                     dateSpan.className = 'birthday-date';
                     const nextBirthday = birthday.nextBirthday;
                     dateSpan.textContent = `${nextBirthday.getFullYear()} 年 ${nextBirthday.getMonth() + 1} 月 ${nextBirthday.getDate()} 日`;
-                    
+
                     const daysSpan = document.createElement('span');
                     daysSpan.className = 'days';
                     daysSpan.textContent = `还有 ${birthday.daysUntil} 天`;
-                    
+
                     li.appendChild(indexSpan);
                     li.appendChild(nameSpan);
                     li.appendChild(dateSpan);
                     li.appendChild(daysSpan);
                     upcomingList.appendChild(li);
                 }
-                
+
                 count += group.birthdays.length;
             }
-            
+
             if (count === 0) {
                 const li = document.createElement('li');
                 li.className = 'birthday-item no-birthday';
@@ -323,13 +432,18 @@
         // 初始化
         function init() {
             updateCurrentTime();
-            updateBirthdays();
-            
+            initSettings().then(() => {
+                updateBirthdays();
+            });
+
             // 每秒更新一次时间
             setInterval(updateCurrentTime, 1000);
-            
+
             // 每分钟更新一次生日列表（避免频繁请求文件）
             setInterval(updateBirthdays, 60000);
+
+            // 添加人数输入框变化监听
+            document.getElementById('count-input').addEventListener('change', updateBirthdays);
         }
 
         // 页面加载完成后初始化
